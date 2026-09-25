@@ -1,0 +1,102 @@
+{
+  "split": "GroupShuffleSplit by client, test_size=0.25, seed=42 (same as Week 4)",
+  "features": [
+    "log_imp_h1",
+    "ctr_h1",
+    "avg_pos_h1",
+    "active_days_h1",
+    "momentum_h1",
+    "age_days",
+    "ctr_gap"
+  ],
+  "sklearn": "1.9.0",
+  "holdout": [
+    {
+      "method": "Random picking (base rate)",
+      "P@50": 0.405,
+      "P@100": 0.405,
+      "P@500": 0.405,
+      "ROC AUC": 0.5
+    },
+    {
+      "method": "Week-4 baseline rule",
+      "P@50": 0.38,
+      "P@100": 0.44,
+      "P@500": 0.438,
+      "ROC AUC": 0.589
+    },
+    {
+      "method": "Logistic Regression",
+      "P@50": 0.88,
+      "P@100": 0.82,
+      "P@500": 0.76,
+      "ROC AUC": 0.721
+    },
+    {
+      "method": "Decision Tree (depth 3)",
+      "P@50": 0.94,
+      "P@100": 0.93,
+      "P@500": 0.902,
+      "ROC AUC": 0.71
+    },
+    {
+      "method": "Random Forest",
+      "P@50": 0.94,
+      "P@100": 0.93,
+      "P@500": 0.89,
+      "ROC AUC": 0.76
+    },
+    {
+      "method": "Gradient Boosting",
+      "P@50": 0.98,
+      "P@100": 0.95,
+      "P@500": 0.892,
+      "ROC AUC": 0.751
+    },
+    {
+      "method": "Momentum only (1 feature, no model)",
+      "P@50": 0.94,
+      "P@100": 0.96,
+      "P@500": 0.898,
+      "ROC AUC": 0.756
+    }
+  ],
+  "groupkfold_5": [
+    {
+      "method": "Decision Tree (depth 3)",
+      "P@50": 0.756,
+      "P@500": 0.714,
+      "ROC AUC": 0.649
+    },
+    {
+      "method": "Gradient Boosting",
+      "P@50": 0.916,
+      "P@500": 0.798,
+      "ROC AUC": 0.677
+    },
+    {
+      "method": "Logistic Regression",
+      "P@50": 0.868,
+      "P@500": 0.728,
+      "ROC AUC": 0.655
+    },
+    {
+      "method": "Momentum only (1 feature, no model)",
+      "P@50": 0.932,
+      "P@500": 0.79,
+      "ROC AUC": 0.669
+    },
+    {
+      "method": "Random Forest",
+      "P@50": 0.884,
+      "P@500": 0.789,
+      "ROC AUC": 0.69
+    },
+    {
+      "method": "Week-4 baseline rule",
+      "P@50": 0.392,
+      "P@500": 0.364,
+      "ROC AUC": 0.573
+    }
+  ]
+}

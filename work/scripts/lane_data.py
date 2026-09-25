@@ -63,6 +63,8 @@ def build_frame(con):
         FROM agg a
         LEFT JOIN {DIM_CONTENT} c USING (client_hash_id, content_hash_id)
     """).df().fillna({"imp_h2": 0, "imp_wk1": 0, "imp_wk2": 0})
+    # DuckDB's GROUP BY output order varies run to run; fix it so ties and splits reproduce
+    frame = frame.sort_values(["client_hash_id", "content_hash_id"]).reset_index(drop=True)
 
     decision = pd.Timestamp(DECISION_DATE)
     frame["log_imp_h1"] = np.log1p(frame["imp_h1"])
