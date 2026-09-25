@@ -1,0 +1,24 @@
+{
+  "rule": "2*(pos<=10 & ctr below position median) + 1*(age 31-180d), x log impressions",
+  "split": "GroupShuffleSplit by client, test_size=0.25, seed=42",
+  "results": [
+    {
+      "slice": "test clients (the comparison)",
+      "n": 24886,
+      "base_rate": 0.405,
+      "P@50": 0.38,
+      "P@100": 0.44,
+      "P@500": 0.438,
+      "roc_auc": 0.589
+    },
+    {
+      "slice": "all pages",
+      "n": 92548,
+      "base_rate": 0.327,
+      "P@50": 0.36,
+      "P@100": 0.37,
+      "P@500": 0.404,
+      "roc_auc": 0.584
+    }
+  ]
+}
