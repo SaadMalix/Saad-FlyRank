@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Which Pages Keep Declining?</title>
+<meta name="description" content="A client-held-out test of a model that ranks content pages by the risk of further search-impression decline, built on the FlyRank ML Internship dataset.">
+<meta property="og:title" content="Which pages will keep losing search impressions?">
+<meta property="og:description" content="An honest, client-held-out test of a refresh-priority model on real FlyRank search data.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  color-scheme: light;
+  --bg: #fcfcfb;
+  --surface: #ffffff;
+  --surface-2: #f4f3f0;
+  --border: #e3e1dc;
+  --text: #16150f;
+  --text-2: #52514e;
+  --text-3: #7a7873;
+  --accent: #256abf;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --ref: #52514e;
+  --grid: #ebe9e4;
+  --good-bg: #e8f3ec;
+  --warn-bg: #fbf1df;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #141413;
+    --surface: #1a1a19;
+    --surface-2: #232321;
+    --border: #34332f;
+    --text: #f4f3ee;
+    --text-2: #c3c2b7;
+    --text-3: #97958c;
+    --accent: #5598e7;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --ref: #c3c2b7;
+    --grid: #2c2c29;
+    --good-bg: #1d2b22;
+    --warn-bg: #2e2717;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #141413;
+  --surface: #1a1a19;
+  --surface-2: #232321;
+  --border: #34332f;
+  --text: #f4f3ee;
+  --text-2: #c3c2b7;
+  --text-3: #97958c;
+  --accent: #5598e7;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --ref: #c3c2b7;
+  --grid: #2c2c29;
+  --good-bg: #1d2b22;
+  --warn-bg: #2e2717;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 17px/1.65 "Source Serif 4", Georgia, serif;
+}
+.wrap { max-width: 760px; margin: 0 auto; padding: 0 16px 80px; }
+header.hero { padding: 56px 0 24px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+.kicker { font: 600 12px/1.4 Inter, system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+h1 { font-size: clamp(30px, 6vw, 42px); line-height: 1.15; margin: 10px 0 14px; letter-spacing: -.01em; }
+.byline { font: 400 14px/1.5 Inter, system-ui, sans-serif; color: var(--text-2); }
+.byline a { color: var(--text-2); }
+h2 { font-size: 26px; line-height: 1.25; margin: 48px 0 12px; padding-top: 8px; }
+h3 { font: 600 16px/1.4 Inter, system-ui, sans-serif; margin: 28px 0 8px; }
+p, li { color: var(--text); }
+a { color: var(--accent); }
+.num { font-variant-numeric: tabular-nums; }
+code { font: 14px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+.abstract { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px 22px; margin: 24px 0; }
+.abstract h2 { margin: 0 0 8px; font-size: 18px; font-family: Inter, system-ui, sans-serif; }
+.abstract p { margin: 0; }
+.tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 24px 0; }
+.tile { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+.tile .v { font: 600 28px/1.1 Inter, system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+.tile .l { font: 400 13px/1.4 Inter, system-ui, sans-serif; color: var(--text-2); margin-top: 6px; }
+@media (max-width: 560px) { .tiles { grid-template-columns: 1fr; } }
+.toc { font: 400 14px/1.9 Inter, system-ui, sans-serif; color: var(--text-2); columns: 2; margin: 16px 0 0; padding-left: 18px; }
+@media (max-width: 560px) { .toc { columns: 1; } }
+.table-wrap { overflow-x: auto; margin: 14px 0; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font: 14px/1.4 Inter, system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+th, td { padding: 9px 12px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { color: var(--text-2); font-weight: 600; background: var(--surface-2); }
+tr:last-child td { border-bottom: 0; }
+td.best { font-weight: 600; }
+figure { margin: 22px 0; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 14px 12px; }
+figure .ftitle { font: 600 15px/1.4 Inter, system-ui, sans-serif; margin: 0 0 2px; }
+figure .fsub { font: 400 13px/1.4 Inter, system-ui, sans-serif; color: var(--text-2); margin: 0 0 8px; }
+figcaption { font: 400 14px/1.5 Inter, system-ui, sans-serif; color: var(--text-2); margin-top: 8px; }
+figcaption strong { color: var(--text); }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font: 400 13px/1.4 Inter, system-ui, sans-serif; color: var(--text-2); margin: 4px 0 6px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.legend i.line { height: 0; border-top: 2px dashed var(--ref); border-radius: 0; width: 16px; }
+.chart { position: relative; width: 100%; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { font-family: Inter, system-ui, sans-serif; }
+.tip { position: absolute; pointer-events: none; background: var(--text); color: var(--bg); font: 500 12px/1.4 Inter, system-ui, sans-serif; padding: 6px 8px; border-radius: 6px; white-space: nowrap; opacity: 0; transform: translate(-50%, -110%); transition: opacity .1s; z-index: 2; }
+details.tv { font: 400 13px/1.4 Inter, system-ui, sans-serif; color: var(--text-2); margin-top: 6px; }
+details.tv summary { cursor: pointer; }
+.note { border-left: 3px solid var(--accent); background: var(--surface); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 18px 0; }
+.callout-warn { background: var(--warn-bg); border-radius: 8px; padding: 12px 16px; margin: 18px 0; }
+.recs { counter-reset: r; list-style: none; padding: 0; }
+.recs li { counter-increment: r; position: relative; padding: 12px 14px 12px 52px; margin: 10px 0; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.recs li::before { content: counter(r); position: absolute; left: 14px; top: 12px; width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: #fff; font: 600 13px/26px Inter, system-ui, sans-serif; text-align: center; }
+footer { margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--border); font: 400 13px/1.6 Inter, system-ui, sans-serif; color: var(--text-3); }
+.theme-toggle { position: fixed; top: 12px; right: 12px; font: 500 12px Inter, system-ui, sans-serif; background: var(--surface); color: var(--text-2); border: 1px solid var(--border); border-radius: 999px; padding: 6px 10px; cursor: pointer; }
+</style>
+</head>
+<body>
+<button class="theme-toggle" id="themeToggle" aria-label="Toggle light or dark theme">Theme</button>
+<main class="wrap">
+
+<header class="hero">
+  <div class="kicker">FlyRank ML Internship · Capstone · Lane 2: Refresh / Content Opportunity Scoring</div>
+  <h1>Which pages will keep losing search impressions?</h1>
+  <div class="byline">Saad (<a href="https://github.com/SaadMalix">@SaadMalix</a>) · Data: FlyRank ML Internship warehouse release, Feb–Jun 2026 · <a href="https://github.com/SaadMalix/Saad-FlyRank">Code &amp; notebooks</a></div>
+  <ol class="toc">
+    <li><a href="#abstract">Abstract</a></li>
+    <li><a href="#intro">Problem</a></li>
+    <li><a href="#data">Data</a></li>
+    <li><a href="#method">Methodology</a></li>
+    <li><a href="#results">Results</a></li>
+    <li><a href="#limits">Limitations</a></li>
+    <li><a href="#recs">Recommendations</a></li>
+    <li><a href="#repro">Reproducibility</a></li>
+    <li><a href="#credit">Acknowledgments</a></li>
+  </ol>
+</header>
+
+<section class="abstract" id="abstract">
+  <h2>Abstract</h2>
+  <p>This project asks which content pages, using only what is known on the 15th of a month, are most likely to lose <em>even more</em> search impressions over the rest of that month, so an editor can review them first. I built one row per page from daily Search Console data in the FlyRank ML Internship warehouse (Feb, Mar and Jun 2026), with seven first-half-of-month signals and a label that only counts further decline from each page's latest week. A Random Forest was compared against a transparent hand-written rule and a one-feature momentum ranking, using client-grouped and time-aware splits, and finally scored once on a sealed month (June 2026) of clients it had never seen. On that sealed test, the model's top 50 pages declined further <span class="num">74%</span> of the time against a <span class="num">49%</span> base rate, but by the top 500 it only tied the rule and its whole-list ROC AUC was near chance (<span class="num">0.52</span>). The result is a small, directional edge at the very top of the list, useful as decision support for a short weekly review queue and not as a site-wide score.</p>
+</section>
+
+<div class="tiles">
+  <div class="tile"><div class="v num" id="t1">0.74</div><div class="l">Top-50 precision, sealed June test (held-out clients)</div></div>
+  <div class="tile"><div class="v num" id="t2">0.49</div><div class="l">Base rate: share of June test pages that declined further</div></div>
+  <div class="tile"><div class="v num" id="t3">0.52</div><div class="l">Whole-list ROC AUC on the same test (0.5 = chance)</div></div>
+</div>
+
+<section id="intro">
+<h2>1. The problem: a short review list, a very long site</h2>
+<p>Picture an SEO editor on the 15th of the month with time to review about 50 pages, out of tens of thousands that are live. Some pages are about to lose visibility. Most are just wobbling. The editor needs a ranked list that puts the pages likely to keep falling at the top, with a plain reason for each one.</p>
+<p>The obvious approach is a hand-written rule, such as "page one, below-average CTR, a few months old". The interesting tension, and most of this paper, is about how easy it is to <strong>fool yourself</strong> when measuring whether a model beats that rule. My first version reported a model that looked 93% precise. After an audit, the honest number turned out to be much smaller. This page reports the honest one, and explains where the big one came from.</p>
+</section>
+
+<section id="data">
+<h2>2. Data</h2>
+<ul>
+  <li><strong>Source:</strong> the FlyRank ML Internship warehouse release (pseudonymized, hosted on Hugging Face), queried in place with DuckDB.</li>
+  <li><strong>Tables:</strong> <code>fact_content_daily_performance</code> (one row = one page on one day, Search Console + Analytics) and <code>dim_content</code> (used only for each page's creation date).</li>
+  <li><strong>Windows:</strong> February and March 2026 for development. <strong>June 2026</strong>, the final month of the panel, was kept sealed and scored once at the end.</li>
+  <li><strong>Unit:</strong> one page per month. Signals come from days 1–15 and the outcome from day 16 to month end.</li>
+  <li><strong>Kept:</strong> rows where <code>gsc_data_available</code> is true. Pages need at least 50 impressions in days 1–15 and 25 in days 8–15.</li>
+  <li><strong>Excluded:</strong> GA4/sessions/AI-referral columns (only filled for some clients and days; zero-filled rows read as "no traffic"), content-update and optimization dates (mostly dated <em>after</em> the decision day, i.e. future information), and all IDs and hashes as features.</li>
+</ul>
+<div class="table-wrap"><table id="tblData"><thead><tr><th>Month</th><th>Pages</th><th>Clients</th><th>Label base rate</th></tr></thead><tbody></tbody></table></div>
+<p>The base rate moves a lot between months. June was a month when impressions drifted down across the whole portfolio, so more pages kept falling. Every result below is shown next to its own base rate.</p>
+</section>
+
+<section id="method">
+<h2>3. Methodology</h2>
+<h3>Features (days 1–15 only)</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Feature</th><th style="text-align:left">Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>log_imp_h1</code></td><td style="text-align:left">log of impressions</td></tr>
+<tr><td><code>ctr_h1</code></td><td style="text-align:left">clicks ÷ impressions</td></tr>
+<tr><td><code>avg_pos_h1</code></td><td style="text-align:left">impression-weighted average position</td></tr>
+<tr><td><code>active_days_h1</code></td><td style="text-align:left">days with at least one impression</td></tr>
+<tr><td><code>momentum_h1</code></td><td style="text-align:left">daily impressions in days 8–15 ÷ days 1–7</td></tr>
+<tr><td><code>age_days</code></td><td style="text-align:left">days since the page was created</td></tr>
+<tr><td><code>ctr_gap</code></td><td style="text-align:left">CTR minus the median CTR of pages at a similar position</td></tr>
+</tbody></table></div>
+
+<h3>Label: only count <em>further</em> decline</h3>
+<p>A page is labelled <strong>1</strong> if its average daily impressions from day 16 to month end fall below <strong>80% of its days 8–15 average</strong>.</p>
+<p>An earlier version compared the second half with the <em>whole</em> first half. That quietly counted a drop that had already happened in week 2 as a "future" decline. So "impressions fell in week 2" (momentum) looked like a superb predictor, even though it was mostly re-reading the past. The chart shows the difference.</p>
+
+<figure>
+  <p class="ftitle">The first label rewarded pages that had already dropped</p>
+  <p class="fsub">Share of March pages labelled "declining", by week-2 momentum, under each label definition</p>
+  <div class="legend"><span><i style="background:var(--series-1)"></i>Original label (vs days 1–15 average)</span><span><i style="background:var(--series-2)"></i>Strict label (vs latest week)</span></div>
+  <div class="chart" id="chartArtifact"></div>
+  <figcaption><strong>Under the original label, falling pages "decline" 64% of the time. Under the strict label it's only 34%, close to the 30% base rate.</strong> Ranking by momentum alone drops from ROC AUC <span class="num" id="aucOrig">0.66</span> to <span class="num" id="aucStrict">0.49</span> (chance).</figcaption>
+  <details class="tv"><summary>Table view</summary><div class="table-wrap"><table id="tblArtifact"><thead><tr><th>Momentum bucket</th><th>Pages</th><th>Original</th><th>Strict</th></tr></thead><tbody></tbody></table></div></details>
+</figure>
+
+<h3>Baselines</h3>
+<ul>
+  <li><strong>Hand-written rule</strong> (frozen before modeling): 2 points for a below-median CTR on page one, 1 point for being 31–180 days old, weighted by log impressions. Both signals were checked with bucket tables first: CTR-vs-position was confirmed on page one, and age was mixed (risk peaks at 3–6 months).</li>
+  <li><strong>Momentum only:</strong> rank by the lowest week-2/week-1 ratio. No model.</li>
+  <li><strong>Random picking:</strong> the base rate.</li>
+</ul>
+
+<h3>Model and validation</h3>
+<p>A Random Forest (300 trees, minimum 20 pages per leaf, seed 42), chosen because it handles non-linear signals without tuning. It was checked three ways, from least to most strict:</p>
+<ol>
+  <li><strong>Client-grouped 5-fold on March:</strong> every test client is unseen in training. A random row split was tried and dropped: it inflated ROC AUC from 0.69 to 0.76 by letting the model memorize each client.</li>
+  <li><strong>Time-aware:</strong> train on February, test on March.</li>
+  <li><strong>Sealed final test:</strong> train on February + March, test on June pages from 12 held-out clients (<span class="num" id="sealedN">32,805</span> pages, zero client overlap). Run once.</li>
+</ol>
+<h3>Leakage checks</h3>
+<ul>
+  <li>Features use days 1–15 only, and only the label uses day 16 onward (asserted in code).</li>
+  <li><strong>Deliberate-leak test:</strong> adding the label-window impressions as a feature pushes ROC AUC from <span class="num" id="leakH">0.61</span> to <span class="num" id="leakL">0.96</span>. The test harness catches leaks, and that column is never a feature.</li>
+  <li>No product flags or post-decision dates are used. No single feature scores suspiciously well.</li>
+</ul>
+</section>
+
+<section id="results">
+<h2>4. Results</h2>
+<h3>Sealed June test: model vs baselines, same pages, same label</h3>
+<figure>
+  <p class="ftitle">The model's edge lives at the very top of the list</p>
+  <p class="fsub">Precision at K on the sealed June test (12 held-out clients). Dashed line = base rate.</p>
+  <div class="legend"><span><i style="background:var(--series-1)"></i>Random Forest</span><span><i style="background:var(--series-2)"></i>Hand-written rule</span><span><i style="background:var(--series-3)"></i>Momentum only</span><span><i class="line"></i>Base rate (49%)</span></div>
+  <div class="chart" id="chartSealed"></div>
+  <figcaption><strong>Top 50: 0.74 for the model vs 0.54 for the rule and 0.49 for random picking. By the top 500, the model and the rule tie at 0.60.</strong> Momentum alone does worse than random.</figcaption>
+  <details class="tv"><summary>Table view</summary><div class="table-wrap"><table id="tblSealed"><thead><tr><th>Method</th><th>P@50</th><th>P@100</th><th>P@500</th><th>ROC AUC</th><th>Base rate</th></tr></thead><tbody></tbody></table></div></details>
+</figure>
+
+<figure>
+  <p class="ftitle">Precision falls toward the base rate quickly</p>
+  <p class="fsub">Share of pages that declined further, by the model's rank band (sealed June test)</p>
+  <div class="legend"><span><i style="background:var(--series-1)"></i>Observed precision in band</span><span><i class="line"></i>Base rate (49%)</span></div>
+  <div class="chart" id="chartBands"></div>
+  <figcaption><strong>The first 50 pages are clearly above base (0.74). Beyond rank 2,000 the list is no better than random.</strong> That's why whole-list ROC AUC is 0.52 while top-50 precision is useful.</figcaption>
+</figure>
+
+<h3>All three validation levels</h3>
+<div class="table-wrap"><table id="tblLadder"><thead><tr><th>Design</th><th>Method</th><th>P@50</th><th>P@500</th><th>ROC AUC</th><th>Base rate</th></tr></thead><tbody></tbody></table></div>
+<p>During development (March, grouped by client) the model looked better: P@50 0.60 vs a 0.30 base rate and AUC 0.61. Trained on February and tested on March, most of that edge disappeared (P@50 0.46, AUC 0.56, no better than the rule). The sealed June test brings back a top-of-list edge but no whole-list skill. <strong>The steady pattern across all three is a modest edge in the first few dozen pages, and nothing reliable below that.</strong></p>
+<p><strong>What the model leans on</strong> (permutation importance, sealed test): average position and page age first, then active days and the CTR gap. Momentum, which looked like the star under the flawed label, barely matters here.</p>
+</section>
+
+<section id="limits">
+<h2>5. Limitations &amp; honest framing</h2>
+<div class="callout-warn">These are <strong>observed, directional</strong> results for <strong>decision support</strong>. They are not a forecast and not a causal finding.</div>
+<ul>
+  <li><strong>No causal claims.</strong> Nothing here shows why pages decline, or that editing a page prevents decline. Recommendations are prompts for human review.</li>
+  <li><strong>Nothing about Google's ranking algorithm.</strong> The inputs are observed Search Console aggregates, not ranking factors.</li>
+  <li><strong>The edge is narrow.</strong> Only the top ~50–100 pages beat the base rate on the sealed test. The whole-list score is near chance and shouldn't be used to sort a whole site.</li>
+  <li><strong>It doesn't transfer well between months.</strong> February → March lost most of the development edge, and the base rate ranged from 22% to 45% across months.</li>
+  <li><strong>Short, noisy windows.</strong> Two-week comparisons react to holidays, one-off spikes and portfolio-wide swings.</li>
+  <li><strong>Coverage.</strong> Only Search Console–tracked pages with enough impressions. New, tiny or untracked pages are out of scope.</li>
+  <li><strong>One label definition, one seed, one held-out client set.</strong> With 12 test clients, a few large clients weigh heavily. The top of the June queue came from 8 clients, one of them holding 19 of the 50.</li>
+  <li><strong>Anonymized data.</strong> Pseudonymized clients and pages. No client can be identified, and none should be inferred.</li>
+</ul>
+</section>
+
+<section id="recs">
+<h2>6. Ranked recommendations (the action playbook)</h2>
+<p>For a live cycle, the model is trained on all February + March pages and scores every page on the 15th. Each page gets a tier, one reason code and one action. The June 2026 cycle is shown below with outcomes known after the fact.</p>
+<div class="table-wrap"><table id="tblTiers"><thead><tr><th>Tier</th><th>Pages</th><th>Observed further decline</th></tr></thead><tbody></tbody></table></div>
+<ol class="recs">
+  <li><strong>Review only Tier A (top 50) each cycle, and cap each client at about 10 pages.</strong> This is where the measured edge is (70% vs 45% in June). The cap stops one publishing batch from filling the whole list.</li>
+  <li><strong><code>young_page_settling</code> (31–180 days, deep positions):</strong> check content completeness against the pages outranking it. This was the most common Tier A reason in June.</li>
+  <li><strong><code>ctr_below_position</code> (page one, CTR below its position's median):</strong> review the title and snippet against the query intent before touching the body.</li>
+  <li><strong><code>already_sliding</code> (week-2 impressions already falling):</strong> review for staleness: facts, dates, missing subtopics.</li>
+  <li><strong><code>rising_at_deep_position</code>:</strong> <em>monitor, don't edit.</em> A gain deep in the results often fades on its own, and editing it now wastes effort.</li>
+  <li><strong><code>model_risk_only</code>:</strong> manual review. The model sees risk that no simple check explains, so a person judges it.</li>
+  <li><strong>Never automate edits from this score,</strong> and re-check it monthly. If the Tier A hit rate falls to the base rate for two cycles in a row, retrain or retire it.</li>
+</ol>
+<h3>Top of the June queue (public-safe preview, no identifiers)</h3>
+<div class="table-wrap"><table id="tblTop"><thead><tr><th>Rank</th><th>Risk</th><th>Reason code</th><th>Impressions (d1–15)</th><th>Avg position</th><th>Momentum</th><th>Age (days)</th></tr></thead><tbody></tbody></table></div>
+</section>
+
+<section id="repro">
+<h2>7. Reproducibility</h2>
+<ul>
+  <li><strong>Repository:</strong> <a href="https://github.com/SaadMalix/Saad-FlyRank">github.com/SaadMalix/Saad-FlyRank</a></li>
+  <li><strong>Capstone notebook</strong> (produces every number and chart on this page): <a href="https://github.com/SaadMalix/Saad-FlyRank/blob/main/work/notebooks/capstone.ipynb">work/notebooks/capstone.ipynb</a></li>
+  <li><strong>Shared data code</strong> (frame, label, rule, splits): <a href="https://github.com/SaadMalix/Saad-FlyRank/blob/main/work/scripts/lane_data.py">work/scripts/lane_data.py</a></li>
+  <li><strong>The path that led here:</strong>
+    <a href="https://github.com/SaadMalix/Saad-FlyRank/blob/main/work/notebooks/w02_ml_task_framing.ipynb">framing</a> ·
+    <a href="https://github.com/SaadMalix/Saad-FlyRank/blob/main/work/notebooks/w03_data_contract.ipynb">data contract</a> ·
+    <a href="https://github.com/SaadMalix/Saad-FlyRank/blob/main/work/notebooks/w04_baseline_score.ipynb">baseline</a> ·
+    <a href="https://github.com/SaadMalix/Saad-FlyRank/blob/main/work/notebooks/w05_model.ipynb">first model</a> ·
+    <a href="https://github.com/SaadMalix/Saad-FlyRank/blob/main/work/notebooks/w06_validation_audit.ipynb">validation audit</a> (where the label artifact was found)</li>
+  <li><strong>To rerun:</strong> request access to the warehouse release on Hugging Face, log in with a read token (<code>hf auth login</code>), install <code>requirements.txt</code>, then run the capstone notebook top to bottom. Seed 42, rows sorted before splitting; scikit-learn 1.9.0. No data files are committed; the ranked queue is regenerated locally.</li>
+</ul>
+</section>
+
+<section id="credit">
+<h2>8. Acknowledgments &amp; data credit</h2>
+<p>Built on the <a href="https://flyrank.ai" target="_blank" rel="noopener">FlyRank ML Internship dataset</a>. Thanks to the FlyRank team for the pseudonymized warehouse release, the starter notebooks, and the weekly sessions. Their public research paper, <em>The State of AI-Driven SEO (March 2026)</em>, was the model for the careful claim language used here.</p>
+</section>
+
+<footer>
+  Public-safe: no client names, domains, URLs, queries or credentials appear on this page. All figures are measured on pseudonymized data and are directional.
+</footer>
+</main>
+
+<script src="results.js"></script>
+<script>
+(function () {
+  // Theme toggle (remembered per viewer; falls back silently when storage is blocked)
+  var root = document.documentElement, btn = document.getElementById("themeToggle");
+  try { var saved = localStorage.getItem("paper-theme"); if (saved) root.setAttribute("data-theme", saved); } catch (e) {}
+  btn.addEventListener("click", function () {
+    var dark = root.getAttribute("data-theme") ? root.getAttribute("data-theme") === "dark"
+             : window.matchMedia("(prefers-color-scheme: dark)").matches;
+    var next = dark ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    try { localStorage.setItem("paper-theme", next); } catch (e) {}
+  });
+
+  var R = window.RESULTS;
+  if (!R) return;
+  var f2 = function (v) { return (v == null ? "–" : Number(v).toFixed(2)); };
+  var f3 = function (v) { return (v == null ? "–" : Number(v).toFixed(3)); };
+  var fint = function (v) { return Number(v).toLocaleString("en-US"); };
+  var css = function (name) { return getComputedStyle(root).getPropertyValue(name).trim(); };
+
+  // ---------- Text + tables from results ----------
+  var sealed = {}; R.sealed.forEach(function (r) { sealed[r.method] = r; });
+  document.getElementById("t1").textContent = f2(sealed["Random Forest"]["P@50"]);
+  document.getElementById("t2").textContent = f2(sealed["Random Forest"]["base rate"]);
+  document.getElementById("t3").textContent = f2(sealed["Random Forest"]["ROC AUC"]);
+  document.getElementById("aucOrig").textContent = f2(R.label_artifact["original label"]["momentum AUC"]);
+  document.getElementById("aucStrict").textContent = f2(R.label_artifact["strict label"]["momentum AUC"]);
+  document.getElementById("sealedN").textContent = fint(R.sealed_meta.test_pages);
+  document.getElementById("leakH").textContent = f2(R.leak_test.honest_auc);
+  document.getElementById("leakL").textContent = f2(R.leak_test.leaky_auc);
+
+  function fill(id, rows) {
+    var tb = document.querySelector("#" + id + " tbody");
+    tb.innerHTML = rows.map(function (cells) {
+      return "<tr>" + cells.map(function (c) { return "<td>" + c + "</td>"; }).join("") + "</tr>";
+    }).join("");
+  }
+  fill("tblData", R.data_summary.map(function (r) { return [r.month, fint(r.pages), r.clients, f3(r["label base rate"])]; }));
+  fill("tblArtifact", R.by_momentum.map(function (r) { return [r.bucket, fint(r.n), f3(r.original), f3(r.strict)]; }));
+  var order = ["Random Forest", "Week-4 rule", "Momentum only"];
+  var nice = { "Random Forest": "Random Forest", "Week-4 rule": "Hand-written rule", "Momentum only": "Momentum only" };
+  fill("tblSealed", order.map(function (m) { var r = sealed[m]; return [nice[m], f2(r["P@50"]), f2(r["P@100"]), f2(r["P@500"]), f3(r["ROC AUC"]), f3(r["base rate"])]; }));
+  var ladder = [];
+  [["March, grouped 5-fold", R.dev_grouped], ["Train Feb → test Mar", R.time_aware], ["Sealed June (held-out clients)", R.sealed]].forEach(function (d) {
+    var idx = {}; d[1].forEach(function (r) { idx[r.method] = r; });
+    order.forEach(function (m, i) { var r = idx[m]; ladder.push([i === 0 ? d[0] : "", nice[m], f2(r["P@50"]), f2(r["P@500"]), f3(r["ROC AUC"]), f3(r["base rate"])]); });
+  });
+  fill("tblLadder", ladder);
+  fill("tblTiers", R.tier_check.map(function (r) { return [r.tier, fint(r.pages), f3(r.observed_further_decline)]; }));
+  fill("tblTop", R.top15.map(function (r) { return [r.rank, f3(r.risk), "<code>" + r.reason_code + "</code>", r.impressions_band, r.position.toFixed(1), r.momentum.toFixed(2), r.age_days]; }));
+
+  // ---------- Minimal SVG bar charts with hover ----------
+  var NS = "http://www.w3.org/2000/svg";
+  function el(tag, attrs, parent) {
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function roundedTopBar(x, y, w, h, r) {
+    r = Math.min(r, w / 2, h);
+    return "M" + x + "," + (y + h) + "V" + (y + r) + "Q" + x + "," + y + " " + (x + r) + "," + y +
+           "H" + (x + w - r) + "Q" + (x + w) + "," + y + " " + (x + w) + "," + (y + r) + "V" + (y + h) + "Z";
+  }
+  // groups: [{label, values:[v per series]}], series: [{name, color}], ref: optional number
+  function groupedBars(containerId, groups, series, opts) {
+    var box = document.getElementById(containerId);
+    box.innerHTML = "";
+    var W = Math.max(300, Math.round(box.clientWidth || 700)), H = W < 500 ? 250 : 300, m = { t: 22, r: 8, b: 40, l: 40 };
+    var iw = W - m.l - m.r, ih = H - m.t - m.b;
+    var svg = el("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": opts.aria }, box);
+    var tip = document.createElement("div"); tip.className = "tip"; box.appendChild(tip);
+    var ymax = opts.ymax || 1;
+    var y = function (v) { return m.t + ih - (v / ymax) * ih; };
+    var ticks = opts.ticks || [0, 0.25, 0.5, 0.75, 1];
+    ticks.forEach(function (t) {
+      el("line", { x1: m.l, x2: W - m.r, y1: y(t), y2: y(t), stroke: css("--grid"), "stroke-width": 1 }, svg);
+      var tx = el("text", { x: m.l - 8, y: y(t) + 4, "text-anchor": "end", "font-size": 12, fill: css("--text-3") }, svg);
+      tx.textContent = opts.pct ? Math.round(t * 100) + "%" : t.toFixed(2);
+    });
+    var gw = iw / groups.length, pad = gw * 0.22, bw = (gw - 2 * pad - (series.length - 1) * 2) / series.length;
+    groups.forEach(function (g, gi) {
+      var gx = m.l + gi * gw + pad;
+      series.forEach(function (s, si) {
+        var v = g.values[si]; if (v == null) return;
+        var bx = gx + si * (bw + 2), by = y(v), bh = y(0) - by;
+        var bar = el("path", { d: roundedTopBar(bx, by, bw, Math.max(bh, 0.5), 4), fill: css(s.color) }, svg);
+        var hit = el("rect", { x: bx - 1, y: m.t, width: bw + 2, height: ih, fill: "transparent", tabindex: 0 }, svg);
+        var show = function () {
+          bar.setAttribute("opacity", "0.85");
+          tip.textContent = g.label + " · " + s.name + ": " + (opts.pct ? (v * 100).toFixed(0) + "%" : v.toFixed(2));
+          var rect = box.getBoundingClientRect(), sc = rect.width / W;
+          tip.style.left = ((bx + bw / 2) * sc) + "px"; tip.style.top = (by * sc) + "px"; tip.style.opacity = 1;
+        };
+        var hide = function () { bar.removeAttribute("opacity"); tip.style.opacity = 0; };
+        hit.addEventListener("mouseenter", show); hit.addEventListener("mouseleave", hide);
+        hit.addEventListener("focus", show); hit.addEventListener("blur", hide);
+        if (opts.labelSeries === si) {
+          var lt = el("text", { x: bx + bw / 2, y: by - 6, "text-anchor": "middle", "font-size": 12, "font-weight": 600, fill: css("--text") }, svg);
+          lt.textContent = opts.pct ? Math.round(v * 100) + "%" : v.toFixed(2);
+        }
+      });
+      var gl = el("text", { x: m.l + gi * gw + gw / 2, y: H - m.b + 20, "text-anchor": "middle", "font-size": 12, fill: css("--text-2") }, svg);
+      gl.textContent = g.label;
+    });
+    el("line", { x1: m.l, x2: W - m.r, y1: y(0), y2: y(0), stroke: css("--text-3"), "stroke-width": 1 }, svg);
+    if (opts.ref != null) {
+      el("line", { x1: m.l, x2: W - m.r, y1: y(opts.ref), y2: y(opts.ref), stroke: css("--ref"), "stroke-width": 2, "stroke-dasharray": "6 5" }, svg);
+    }
+  }
+
+  function k(n) { n = Number(n); return n >= 1000 ? (n / 1000).toFixed(n % 1000 ? 1 : 0).replace(/\.0$/, "") + "K" : String(n); }
+  function shortBand(s) { var p = s.split("-"); return p[0] === "10001" || Number(p[0]) > 10000 ? k(Number(p[0]) - 1) + "+" : k(p[0]) + "–" + k(p[1]); }
+  function drawAll() {
+    groupedBars("chartArtifact",
+      R.by_momentum.map(function (r) { return { label: r.bucket, values: [r.original, r.strict] }; }),
+      [{ name: "Original label", color: "--series-1" }, { name: "Strict label", color: "--series-2" }],
+      { aria: "Share of pages labelled declining by momentum bucket under the original and strict labels", pct: true, ymax: 0.8, ticks: [0, 0.2, 0.4, 0.6, 0.8], labelSeries: null });
+    var ks = ["P@50", "P@100", "P@500"];
+    groupedBars("chartSealed",
+      ks.map(function (k) { return { label: "Top " + k.slice(2), values: order.map(function (m) { return sealed[m][k]; }) }; }),
+      [{ name: "Random Forest", color: "--series-1" }, { name: "Hand-written rule", color: "--series-2" }, { name: "Momentum only", color: "--series-3" }],
+      { aria: "Precision at 50, 100 and 500 on the sealed June test for three methods", pct: true, ref: sealed["Random Forest"]["base rate"], labelSeries: 0 });
+    groupedBars("chartBands",
+      R.rank_bands.map(function (r) { return { label: shortBand(r.ranks), values: [r.precision] }; }),
+      [{ name: "Precision", color: "--series-1" }],
+      { aria: "Precision by rank band on the sealed June test", pct: true, ref: sealed["Random Forest"]["base rate"], labelSeries: 0 });
+  }
+  drawAll();
+  var t; window.addEventListener("resize", function () { clearTimeout(t); t = setTimeout(drawAll, 150); });
+  new MutationObserver(drawAll).observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", drawAll);
+})();
+</script>
+</body>
+</html>
