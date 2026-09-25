@@ -1,11 +1,12 @@
-"""Shared data code for my Lane 2 (refresh / decline) notebooks, weeks 3-5.
+"""Shared data code for my Lane 2 (refresh / decline) notebooks, weeks 3-6.
 
 One place builds the page-level frame, the baseline rule and the split, so the
 baseline (w04) and the model (w05) use exactly the same rows, labels and test clients.
 
-Decision moment: end of 2026-03-15.
-Features use 1-15 March only; the label uses 16-31 March only.
+Decision moment: end of the 15th of the month (default March 2026).
+Features use days 1-15 only; the label uses day 16 to month end only.
 """
+import calendar
 import os
 
 import duckdb
@@ -18,7 +19,11 @@ MONTH = "2026-03"
 DECISION_DATE = "2026-03-15"
 SEED = 42
 
-FACT = f"read_parquet('{REL}/fact_content_daily_performance/month={MONTH}/*.parquet')"
+def fact_table(month=MONTH):
+    return f"read_parquet('{REL}/fact_content_daily_performance/month={month}/*.parquet')"
+
+
+FACT = fact_table()
 DIM_CONTENT = f"read_parquet('{REL}/dim_content.parquet')"
 
 
@@ -36,25 +41,32 @@ def connect():
     return con
 
 
-def build_frame(con):
-    """One row per page: first-half (1-15 Mar) signals + second-half label."""
+def build_frame(con, month=MONTH, keep_future=False):
+    """One row per page: first-half (days 1-15) signals + second-half label.
+
+    keep_future=True keeps imp_h2 (the label window) for audits ONLY - never as a feature.
+    """
+    year, mon = map(int, month.split("-"))
+    h2_days = calendar.monthrange(year, mon)[1] - 15
+    decision_date = f"{month}-15"
+    week1_end = f"{month}-07"
     frame = con.sql(f"""
         WITH d AS (
             SELECT client_hash_id, content_hash_id, report_date,
                    gsc_impressions, gsc_clicks, gsc_sum_position
-            FROM {FACT}
+            FROM {fact_table(month)}
             WHERE gsc_data_available IS TRUE
         ),
         agg AS (
             SELECT client_hash_id, content_hash_id,
-                SUM(gsc_impressions)  FILTER (WHERE report_date <= DATE '{DECISION_DATE}') AS imp_h1,
-                SUM(gsc_clicks)       FILTER (WHERE report_date <= DATE '{DECISION_DATE}') AS clk_h1,
-                SUM(gsc_sum_position) FILTER (WHERE report_date <= DATE '{DECISION_DATE}') AS sumpos_h1,
-                COUNT(*) FILTER (WHERE report_date <= DATE '{DECISION_DATE}' AND gsc_impressions > 0) AS active_days_h1,
-                SUM(gsc_impressions)  FILTER (WHERE report_date <= DATE '2026-03-07') AS imp_wk1,
-                SUM(gsc_impressions)  FILTER (WHERE report_date >  DATE '2026-03-07'
-                                                AND report_date <= DATE '{DECISION_DATE}') AS imp_wk2,
-                SUM(gsc_impressions)  FILTER (WHERE report_date >  DATE '{DECISION_DATE}') AS imp_h2
+                SUM(gsc_impressions)  FILTER (WHERE report_date <= DATE '{decision_date}') AS imp_h1,
+                SUM(gsc_clicks)       FILTER (WHERE report_date <= DATE '{decision_date}') AS clk_h1,
+                SUM(gsc_sum_position) FILTER (WHERE report_date <= DATE '{decision_date}') AS sumpos_h1,
+                COUNT(*) FILTER (WHERE report_date <= DATE '{decision_date}' AND gsc_impressions > 0) AS active_days_h1,
+                SUM(gsc_impressions)  FILTER (WHERE report_date <= DATE '{week1_end}') AS imp_wk1,
+                SUM(gsc_impressions)  FILTER (WHERE report_date >  DATE '{week1_end}'
+                                                AND report_date <= DATE '{decision_date}') AS imp_wk2,
+                SUM(gsc_impressions)  FILTER (WHERE report_date >  DATE '{decision_date}') AS imp_h2
             FROM d
             GROUP BY 1, 2
             HAVING imp_h1 >= 50
@@ -66,7 +78,7 @@ def build_frame(con):
     # DuckDB's GROUP BY output order varies run to run; fix it so ties and splits reproduce
     frame = frame.sort_values(["client_hash_id", "content_hash_id"]).reset_index(drop=True)
 
-    decision = pd.Timestamp(DECISION_DATE)
+    decision = pd.Timestamp(decision_date)
     frame["log_imp_h1"] = np.log1p(frame["imp_h1"])
     frame["ctr_h1"] = frame["clk_h1"] / frame["imp_h1"]
     # gsc_sum_position = 0 means no position was recorded, not rank 0
@@ -80,8 +92,11 @@ def build_frame(con):
     expected = frame.groupby("pos_bucket", observed=True)["ctr_h1"].transform("median")
     frame["ctr_gap"] = frame["ctr_h1"] - expected
 
-    # Label: average daily impressions in 16-31 Mar (16 days) below 80% of 1-15 Mar (15 days)
-    frame["is_declining"] = ((frame["imp_h2"] / 16) < 0.8 * (frame["imp_h1"] / 15)).astype(int)
+    # Label: average daily impressions from day 16 to month end below 80% of days 1-15
+    frame["is_declining"] = ((frame["imp_h2"] / h2_days) < 0.8 * (frame["imp_h1"] / 15)).astype(int)
+    if keep_future:
+        frame["h2_days"] = h2_days
+        return frame
     return frame.drop(columns=["imp_h2"])   # the label stays, the future column goes
 
 

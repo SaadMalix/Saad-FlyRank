@@ -1,0 +1,117 @@
+{
+  "before_after": [
+    {
+      "design": "1. BEFORE: random 5-fold",
+      "method": "Momentum only",
+      "P@50": 0.928,
+      "P@500": 0.795,
+      "ROC AUC": 0.674,
+      "base rate": 0.327
+    },
+    {
+      "design": "1. BEFORE: random 5-fold",
+      "method": "Random Forest",
+      "P@50": 0.944,
+      "P@500": 0.871,
+      "ROC AUC": 0.762,
+      "base rate": 0.327
+    },
+    {
+      "design": "2. AFTER: grouped by client (5-fold)",
+      "method": "Momentum only",
+      "P@50": 0.932,
+      "P@500": 0.79,
+      "ROC AUC": 0.669,
+      "base rate": 0.327
+    },
+    {
+      "design": "2. AFTER: grouped by client (5-fold)",
+      "method": "Random Forest",
+      "P@50": 0.884,
+      "P@500": 0.789,
+      "ROC AUC": 0.69,
+      "base rate": 0.327
+    },
+    {
+      "design": "3. AFTER: time-aware (Feb -> Mar)",
+      "method": "Momentum only",
+      "P@50": 0.94,
+      "P@500": 0.912,
+      "ROC AUC": 0.674,
+      "base rate": 0.327
+    },
+    {
+      "design": "3. AFTER: time-aware (Feb -> Mar)",
+      "method": "Random Forest",
+      "P@50": 0.78,
+      "P@500": 0.812,
+      "ROC AUC": 0.65,
+      "base rate": 0.327
+    },
+    {
+      "design": "4. AFTER: time + client (Feb -> Mar, unseen clients)",
+      "method": "Momentum only",
+      "P@50": 0.94,
+      "P@500": 0.898,
+      "ROC AUC": 0.756,
+      "base rate": 0.405
+    },
+    {
+      "design": "4. AFTER: time + client (Feb -> Mar, unseen clients)",
+      "method": "Random Forest",
+      "P@50": 0.96,
+      "P@500": 0.84,
+      "ROC AUC": 0.703,
+      "base rate": 0.405
+    }
+  ],
+  "label_mechanics": [
+    {
+      "label": "original (vs days 1-15 average)",
+      "base rate": 0.327,
+      "momentum-only AUC": 0.674,
+      "momentum-only P@50": 0.94
+    },
+    {
+      "label": "strict (vs latest week 8-15)",
+      "base rate": 0.301,
+      "momentum-only AUC": 0.49,
+      "momentum-only P@50": 0.0
+    }
+  ],
+  "strict_label_grouped_5fold": [
+    {
+      "method": "Momentum only",
+      "P@50 mean": 0.424,
+      "P@50 std": 0.192,
+      "P@500 mean": 0.334,
+      "P@500 std": 0.078,
+      "ROC AUC mean": 0.478,
+      "ROC AUC std": 0.062,
+      "base rate mean": 0.301,
+      "base rate std": 0.071
+    },
+    {
+      "method": "Random Forest",
+      "P@50 mean": 0.604,
+      "P@50 std": 0.158,
+      "P@500 mean": 0.532,
+      "P@500 std": 0.133,
+      "ROC AUC mean": 0.608,
+      "ROC AUC std": 0.024,
+      "base rate mean": 0.301,
+      "base rate std": 0.071
+    },
+    {
+      "method": "Week-4 baseline rule",
+      "P@50 mean": 0.348,
+      "P@50 std": 0.09,
+      "P@500 mean": 0.317,
+      "P@500 std": 0.037,
+      "ROC AUC mean": 0.56,
+      "ROC AUC std": 0.026,
+      "base rate mean": 0.301,
+      "base rate std": 0.071
+    }
+  ]
+}
